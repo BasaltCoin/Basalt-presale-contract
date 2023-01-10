@@ -152,7 +152,7 @@ contract BasaltTokenSale is Ownable {
         if (referrerFee > 0) {
             IERC20(paymentInfo.tokenAddress).safeTransferFrom(
                 msg.sender,
-                _referrer,
+                user.referrer,
                 referrerFee
             );
         }
