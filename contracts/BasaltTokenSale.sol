@@ -181,8 +181,10 @@ contract BasaltTokenSale is Ownable {
             currentStage = NUMBER_OF_STAGES;
         }
         uint256 allowedAmount = (user.totalPurchasedAmount * currentStage) /
-            NUMBER_OF_STAGES -
-            user.totalWithdrawnAmount;
+            NUMBER_OF_STAGES;
+        allowedAmount = allowedAmount > user.totalWithdrawnAmount
+            ? allowedAmount - user.totalWithdrawnAmount
+            : 0;
         if (allowedAmount > 0) {
             user.totalWithdrawnAmount += allowedAmount;
             userInfo[msg.sender] = user;
@@ -206,5 +208,24 @@ contract BasaltTokenSale is Ownable {
             totalPurchasedAmount += userPurchasedAmount;
         }
         return (totalPurchasedAmount, referralsInfo);
+    }
+
+    function getAllowedAmount(
+        address _user
+    ) external view returns (uint256 allowedAmount) {
+        UserInfo memory user = userInfo[_user];
+        if (user.unlockStartTime < block.timestamp) {
+            uint256 currentStage = (block.timestamp - user.unlockStartTime) /
+                STAGE_DURATION;
+            if (currentStage > NUMBER_OF_STAGES) {
+                currentStage = NUMBER_OF_STAGES;
+            }
+            allowedAmount =
+                (user.totalPurchasedAmount * currentStage) /
+                NUMBER_OF_STAGES;
+            allowedAmount = allowedAmount > user.totalWithdrawnAmount
+                ? allowedAmount - user.totalWithdrawnAmount
+                : 0;
+        }
     }
 }
