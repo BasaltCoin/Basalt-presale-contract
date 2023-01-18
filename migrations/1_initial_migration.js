@@ -4,11 +4,11 @@ const BasaltToken = artifacts.require("BasaltToken");
 module.exports = async (deployer, network) => {
   if (network == "bscmain") {
     const BUSD_ADDRESS="0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56";
-    const PRE_MINT_AMOUNT=web3.utils.toWei("1000000", "ether");
+    const PRE_MINT_AMOUNT=web3.utils.toWei("1000000000", "ether");//ether for decimals:18(BUSD)
     try {
       const paymentToken={
         tokenAddress:BUSD_ADDRESS,
-        price:web3.utils.toWei("2", "ether"),
+        price:web3.utils.toWei("0.03", "ether"),
     }
       await deployer.deploy(BasaltToken,PRE_MINT_AMOUNT);
       await deployer.deploy(BasaltTokenSale,BasaltToken.address,paymentToken);

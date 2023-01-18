@@ -5,14 +5,14 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
 
 contract BasaltTokenSale is Ownable {
     using SafeERC20 for IERC20;
 
     struct PaymentToken {
         address tokenAddress;
-        uint256 price; // price in basaltToken of one paymentToken
+        uint256 price; // price of one basaltToken
     }
 
     struct ReferralInfo {
@@ -145,9 +145,8 @@ contract BasaltTokenSale is Ownable {
 
         user.totalPurchasedAmount += _basaltTokenAmount;
 
-        uint256 payableAmount = (_basaltTokenAmount *
-            10 ** IERC20Metadata(paymentInfo.tokenAddress).decimals()) /
-            paymentInfo.price;
+        uint256 payableAmount = _basaltTokenAmount * paymentInfo.price / 10**18;
+
         uint256 referrerFee = (payableAmount * REFERRER_FEE_BP) / BP;
         if (referrerFee > 0) {
             IERC20(paymentInfo.tokenAddress).safeTransferFrom(

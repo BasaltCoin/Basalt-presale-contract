@@ -30,7 +30,7 @@ contract("BasaltTokenSale",  ([owner, referrer, user,user1]) => {
         this.basaltToken =await BasaltToken.new(web3.utils.toWei("100000", "ether"));
         const paymentToken={
             tokenAddress:BUSD_ADDRESS,
-            price:web3.utils.toWei("2", "ether"),
+            price:web3.utils.toWei("0.5", "ether"),
         }
         this.basaltTokenSale=await BasaltTokenSale.new(this.basaltToken.address,paymentToken, { from: owner });
         
@@ -44,7 +44,7 @@ contract("BasaltTokenSale",  ([owner, referrer, user,user1]) => {
     it('addPaymentToken', async () => {
         const paymentToken={
             tokenAddress:USDT_ADDRESS,
-            price:web3.utils.toWei("2", "ether"),
+            price:web3.utils.toWei("0.5", "ether"),
         }
         await this.basaltTokenSale.addPaymentToken(paymentToken, { from: owner });
     });
