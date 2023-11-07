@@ -6,13 +6,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-
 contract BasaltTokenSale is Ownable {
     using SafeERC20 for IERC20;
 
     struct PaymentToken {
         address tokenAddress;
-        uint256 price; // price of one basaltToken
+        uint256 price; //price of one basaltToken
     }
 
     struct ReferralInfo {
@@ -27,16 +26,18 @@ contract BasaltTokenSale is Ownable {
         uint256 unlockStartTime;
     }
 
-    uint256 public constant PURCHASE_PERIOD = 360 days;
+    uint256 public constant PURCHASE_PERIOD = 30 days;
     uint256 public constant STAGE_DURATION = 30 days;
-    uint256 public constant NUMBER_OF_STAGES = 48;
+    uint256 public constant NUMBER_OF_STAGES = 28;
     uint256 public constant REFERRER_FEE_BP = 250; //2.5%
     uint256 public constant BP = 10000;
     uint256 public constant MINIMUM_PURCHASED_AMOUNT = 1e18;
-    IERC20 public immutable basaltToken;
+    address public immutable basaltToken;
     uint256 public totalLockedAmount;
+    uint256 public immutable firstUnlockAmtBP;
 
     PaymentToken[] public paymentTokens;
+    mapping(address => bool) public isPaymentToken;
     mapping(address => UserInfo) public userInfo;
     mapping(address => address[]) public referrals;
 
@@ -45,30 +46,39 @@ contract BasaltTokenSale is Ownable {
         _;
     }
 
-    constructor(IERC20 _basaltToken, PaymentToken memory _paymentToken) {
+    constructor(
+        address _basaltToken,
+        PaymentToken[] memory _paymentTokens,
+        uint256 _firstUnlockAmtBP
+    ) {
         basaltToken = _basaltToken;
-        paymentTokens.push(_paymentToken);
+        firstUnlockAmtBP = _firstUnlockAmtBP;
+        for (uint256 i; i < _paymentTokens.length; i++) {
+            paymentTokens.push(_paymentTokens[i]);
+            isPaymentToken[_paymentTokens[i].tokenAddress] = true;
+        }
     }
 
     function addPaymentToken(
         PaymentToken calldata _paymentToken
     ) external onlyOwner {
-        for (uint256 i = 0; i < paymentTokens.length; i++) {
-            require(
-                paymentTokens[i].tokenAddress != _paymentToken.tokenAddress,
-                "token already exist"
-            );
-        }
+        require(
+            isPaymentToken[_paymentToken.tokenAddress] == false,
+            "token already exist"
+        );
+        isPaymentToken[_paymentToken.tokenAddress] = true;
         paymentTokens.push(_paymentToken);
     }
 
     function removePaymentToken(
         uint256 _paymentTokenID
     ) external onlyOwner correctID(_paymentTokenID) {
+        address tokenAddress = paymentTokens[_paymentTokenID].tokenAddress;
         paymentTokens[_paymentTokenID] = paymentTokens[
             paymentTokens.length - 1
         ];
         paymentTokens.pop();
+        isPaymentToken[tokenAddress] = false;
     }
 
     function changePaymentToken(
@@ -79,18 +89,19 @@ contract BasaltTokenSale is Ownable {
     }
 
     function inCaseTokensGetStuck(
-        IERC20 _token,
+        address _token,
         uint256 _amount,
         address _to
     ) external onlyOwner {
         if (_token == basaltToken) {
             require(
                 _amount <=
-                    basaltToken.balanceOf(address(this)) - totalLockedAmount,
+                    IERC20(basaltToken).balanceOf(address(this)) -
+                        totalLockedAmount,
                 "_amount exceeds free balance"
             );
         }
-        _token.safeTransfer(_to, _amount);
+        _pay(_token, address(this), _to, _amount);
     }
 
     function unlockAcceleration(
@@ -106,7 +117,7 @@ contract BasaltTokenSale is Ownable {
         if (unlockingAmount > 0) {
             user.totalWithdrawnAmount += unlockingAmount;
             totalLockedAmount -= unlockingAmount;
-            basaltToken.safeTransfer(_to, unlockingAmount);
+            _pay(basaltToken, address(this), _to, unlockingAmount);
         }
     }
 
@@ -121,11 +132,12 @@ contract BasaltTokenSale is Ownable {
         );
         require(
             _basaltTokenAmount <=
-                basaltToken.balanceOf(address(this)) - totalLockedAmount,
+                IERC20(basaltToken).balanceOf(address(this)) -
+                    totalLockedAmount,
             "_basaltTokenAmount exceeds free balance"
         );
 
-        UserInfo memory user = userInfo[msg.sender];
+        UserInfo storage user = userInfo[msg.sender];
         PaymentToken memory paymentInfo = paymentTokens[_paymentTokenID];
 
         if (user.referrer == address(0)) {
@@ -144,29 +156,19 @@ contract BasaltTokenSale is Ownable {
         }
 
         user.totalPurchasedAmount += _basaltTokenAmount;
+        totalLockedAmount += _basaltTokenAmount;
 
-        uint256 payableAmount = _basaltTokenAmount * paymentInfo.price / 10**18;
+        uint256 payableAmount = (_basaltTokenAmount * paymentInfo.price) /
+            10 ** 18;
 
         uint256 referrerFee = (payableAmount * REFERRER_FEE_BP) / BP;
-        if (referrerFee > 0) {
-            IERC20(paymentInfo.tokenAddress).safeTransferFrom(
-                msg.sender,
-                user.referrer,
-                referrerFee
-            );
-        }
-
-        IERC20(paymentInfo.tokenAddress).safeTransferFrom(
-            msg.sender,
-            owner(),
-            payableAmount - referrerFee
-        );
-        totalLockedAmount += _basaltTokenAmount;
-        userInfo[msg.sender] = user;
+        payableAmount -= referrerFee;
+        _pay(paymentInfo.tokenAddress, msg.sender, user.referrer, referrerFee);
+        _pay(paymentInfo.tokenAddress, msg.sender, owner(), payableAmount);
     }
 
     function withdrawUnlockedBasaltTokens() external {
-        UserInfo memory user = userInfo[msg.sender];
+        UserInfo storage user = userInfo[msg.sender];
         uint256 lockedAmount = user.totalPurchasedAmount -
             user.totalWithdrawnAmount;
         require(lockedAmount > 0, "you don't have tokens");
@@ -174,22 +176,11 @@ contract BasaltTokenSale is Ownable {
             user.unlockStartTime < block.timestamp,
             "unlock has not started yet"
         );
-        uint256 currentStage = (block.timestamp - user.unlockStartTime) /
-            STAGE_DURATION;
-        if (currentStage > NUMBER_OF_STAGES) {
-            currentStage = NUMBER_OF_STAGES;
-        }
-        uint256 allowedAmount = (user.totalPurchasedAmount * currentStage) /
-            NUMBER_OF_STAGES;
-        allowedAmount = allowedAmount > user.totalWithdrawnAmount
-            ? allowedAmount - user.totalWithdrawnAmount
-            : 0;
-        if (allowedAmount > 0) {
-            user.totalWithdrawnAmount += allowedAmount;
-            userInfo[msg.sender] = user;
-            totalLockedAmount -= allowedAmount;
-            basaltToken.safeTransfer(msg.sender, allowedAmount);
-        }
+        uint256 allowedAmount = getAllowedAmount(msg.sender);
+        require(allowedAmount > 0, "no tokens available for withdrawal");
+        user.totalWithdrawnAmount += allowedAmount;
+        totalLockedAmount -= allowedAmount;
+        _pay(basaltToken, address(this), msg.sender, allowedAmount);
     }
 
     function getReferralsInfo(
@@ -211,20 +202,40 @@ contract BasaltTokenSale is Ownable {
 
     function getAllowedAmount(
         address _user
-    ) external view returns (uint256 allowedAmount) {
+    ) public view returns (uint256 allowedAmount) {
         UserInfo memory user = userInfo[_user];
-        if (user.unlockStartTime < block.timestamp) {
+        uint256 lockedAmount = user.totalPurchasedAmount -
+            user.totalWithdrawnAmount;
+        if (lockedAmount > 0 && user.unlockStartTime < block.timestamp) {
             uint256 currentStage = (block.timestamp - user.unlockStartTime) /
                 STAGE_DURATION;
             if (currentStage > NUMBER_OF_STAGES) {
                 currentStage = NUMBER_OF_STAGES;
             }
+            uint256 firstUnlockAmt = (user.totalPurchasedAmount *
+                firstUnlockAmtBP) / BP;
             allowedAmount =
-                (user.totalPurchasedAmount * currentStage) /
+                firstUnlockAmt +
+                ((user.totalPurchasedAmount - firstUnlockAmt) * currentStage) /
                 NUMBER_OF_STAGES;
             allowedAmount = allowedAmount > user.totalWithdrawnAmount
                 ? allowedAmount - user.totalWithdrawnAmount
                 : 0;
+        }
+    }
+
+    function _pay(
+        address token,
+        address payer,
+        address recipient,
+        uint256 value
+    ) private {
+        if (value > 0) {
+            if (payer == address(this)) {
+                IERC20(token).safeTransfer(recipient, value);
+            } else {
+                IERC20(token).safeTransferFrom(payer, recipient, value);
+            }
         }
     }
 }

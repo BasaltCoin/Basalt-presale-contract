@@ -42,38 +42,40 @@ module.exports = {
       port: 8545,            // Standard Ethereum port (default: none)
       network_id: "*",       // Any network (default: none)
       //network_id: 1,        // Ethereum public network
-    // optional config values:
-    // gas                  -
-    // gasPrice             - use gas and gasPrice if creating type 0 transactions
-    // maxFeePerGas         -
-    // maxPriorityFeePerGas - use maxFeePerGas and maxPriorityFeePerGas if creating type 2 transactions (https://eips.ethereum.org/EIPS/eip-1559)
-    // from - default address to use for any transaction Truffle makes during migrations
-    // provider - web3 provider instance Truffle should use to talk to the Ethereum network.
-    //          - function that returns a web3 provider instance (see below.)
-    //          - if specified, host and port are ignored.
-    // skipDryRun: - true if you don't want to test run the migration locally before the actual migration (default is false)
-    // confirmations: 5, //- number of confirmations to wait between deployments (default: 0)
-    // timeoutBlocks: - if a transaction is not mined, keep waiting for this number of blocks (default is 50)
-    // deploymentPollingInterval: - duration between checks for completion of deployment transactions
-    // disableConfirmationListener: - true to disable web3's confirmation listener
-     },
-     bscmain: {
-       network_id: 56,
-       networkCheckTimeout: 10000,
-       provider: () => new HDWalletProvider({
-         providerOrUrl: process.env.BSC_MAIN_RPC_URL,
-         privateKeys: [process.env.PRIVATE_KEY_BSC]
-       }),
-       skipDryRun: false,
-     },
-     bsctest: {
-       //provider: () => new HDWalletProvider([process.env.PRIVATE_KEY_BSC_TEST], process.env.INFURA_BSC),
-       provider: () => new HDWalletProvider({
-         providerOrUrl: process.env.BSC_TEST_RPC_URL,
-         privateKeys: [process.env.PRIVATE_KEY_BSC]
-       }),
-       url: process.env.BSC_TEST_RPC_URL,
-       network_id: 97
+      // optional config values:
+      // gas                  -
+      // gasPrice             - use gas and gasPrice if creating type 0 transactions
+      // maxFeePerGas         -
+      // maxPriorityFeePerGas - use maxFeePerGas and maxPriorityFeePerGas if creating type 2 transactions (https://eips.ethereum.org/EIPS/eip-1559)
+      // from - default address to use for any transaction Truffle makes during migrations
+      // provider - web3 provider instance Truffle should use to talk to the Ethereum network.
+      //          - function that returns a web3 provider instance (see below.)
+      //          - if specified, host and port are ignored.
+      // skipDryRun: - true if you don't want to test run the migration locally before the actual migration (default is false)
+      // confirmations: 5, //- number of confirmations to wait between deployments (default: 0)
+      // timeoutBlocks: - if a transaction is not mined, keep waiting for this number of blocks (default is 50)
+      // deploymentPollingInterval: - duration between checks for completion of deployment transactions
+      // disableConfirmationListener: - true to disable web3's confirmation listener
+    },
+    bscmain: {
+      network_id: 56,
+      networkCheckTimeout: 10000,
+      provider: () => new HDWalletProvider({
+        providerOrUrl: process.env.BSC_MAIN_RPC_URL,
+        privateKeys: [process.env.PRIVATE_KEY_BSC]
+      }),
+      skipDryRun: false,
+      gas: 10000000,
+      gasPrice: 3000000000,
+    },
+    bsctest: {
+      //provider: () => new HDWalletProvider([process.env.PRIVATE_KEY_BSC_TEST], process.env.INFURA_BSC),
+      provider: () => new HDWalletProvider({
+        providerOrUrl: process.env.BSC_TEST_RPC_URL,
+        privateKeys: [process.env.PRIVATE_KEY_BSC]
+      }),
+      url: process.env.BSC_TEST_RPC_URL,
+      network_id: 97
     },
     matic: {
       provider: () => new HDWalletProvider({
@@ -136,16 +138,16 @@ module.exports = {
   // Configure your compilers
   compilers: {
     solc: {
-       version: "0.8.17",    // Fetch exact version from solc-bin (default: truffle's version)
+      version: "0.8.17",    // Fetch exact version from solc-bin (default: truffle's version)
       // docker: true,        // Use "0.5.1" you've installed locally with docker (default: false)
-       settings: {          // See the solidity docs for advice about optimization and evmVersion
+      settings: {          // See the solidity docs for advice about optimization and evmVersion
         optimizer: {
           enabled: true,
           runs: 200
         },
         //evmVersion: "istanbul",
         // viaIR: true
-       }
+      }
     }
   },
   plugins: [
@@ -153,7 +155,7 @@ module.exports = {
   ],
   api_keys: {
     etherscan: process.env.ETHERSCAN_API_KEY,
-    bscscan:  process.env.BSCSCAN_API_KEY,
+    bscscan: process.env.BSCSCAN_API_KEY,
     polygonscan: process.env.POLIGONSCAN_API_KEY
   }
 
